@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Habit Tracker">
+<title>Habit Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root {
+    --bg: #0F0E0C;
+    --surface: #1C1A17;
+    --surface2: #252220;
+    --border: #2E2B27;
+    --green: #4A8C5C;
+    --green-dim: rgba(74,140,92,0.18);
+    --green-border: #2E6644;
+    --gold: #C9973A;
+    --cream: #F0EAE0;
+    --muted: #6B6560;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; background:var(--bg); color:var(--cream); font-family:'DM Sans',sans-serif; font-weight:300; overflow-x:hidden; }
+  body { display:flex; flex-direction:column; min-height:100dvh; padding:env(safe-area-inset-top,20px) 0 env(safe-area-inset-bottom,20px); }
+
+  .app { flex:1; display:flex; flex-direction:column; max-width:420px; margin:0 auto; width:100%; padding:0 16px 32px; }
+
+  /* HEADER */
+  .header { padding:20px 0 16px; border-bottom:1px solid var(--border); margin-bottom:20px; text-align:center; }
+  .header-eyebrow { font-family:'DM Serif Display',serif; font-size:20px; letter-spacing:-0.01em; text-transform:none; color:#2563EB; margin-bottom:6px; font-style:italic; }
+  .header-name { font-family:'DM Serif Display',serif; font-size:32px; line-height:1.15; color:var(--green); font-style:italic; }
+
+  /* STREAK */
+  .streak-badge { background:var(--green-dim); border:1px solid var(--green-border); border-radius:20px; padding:20px 40px; text-align:center; margin-bottom:20px; }
+  .streak-number { font-family:'DM Serif Display',serif; font-size:88px; color:var(--green); line-height:1; letter-spacing:-0.03em; }
+  .streak-label { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-top:4px; }
+
+  /* MONTH NAV */
+  .month-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .month-title { font-family:'DM Serif Display',serif; font-size:22px; color:#1A1A1A; }
+  .nav-btn { background:var(--surface); border:1px solid var(--border); color:var(--cream); width:36px; height:36px; border-radius:8px; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .nav-btn:active { opacity:0.6; transform:scale(0.93); }
+  .nav-btn:disabled { opacity:0.2; cursor:default; }
+
+  /* CALENDAR GRID */
+  .day-labels { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px; }
+  .day-label { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; color:#1A1A1A; text-align:center; padding:4px 0; background:var(--cream); border-radius:4px; }
+
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:24px; }
+
+  .cell { aspect-ratio:1; border-radius:8px; border:1.5px solid #C8C8C8; background:#F0F0F0; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.18s cubic-bezier(0.34,1.56,0.64,1); position:relative; overflow:hidden; }
+  .cell::before { content:''; position:absolute; inset:0; background:rgba(37,99,235,0.15); opacity:0; transition:opacity 0.2s; }
+  .cell.done { border-color:#2563EB; background:#2563EB; transform:scale(0.95); }
+  .cell.done::before { opacity:1; }
+  .cell.today { border-color:#1D4ED8; box-shadow:0 0 0 2px rgba(37,99,235,0.4); }
+  .cell.future { opacity:0.45; cursor:pointer; }
+  .cell.empty { border:none; background:none; cursor:default; pointer-events:none; }
+
+  .cell-date { font-family:'DM Mono',monospace; font-size:13px; font-weight:600; color:#1A1A1A; z-index:1; line-height:1; transition:color 0.2s; }
+  .cell.done .cell-date { color:#FFFFFF; }
+  .cell.today .cell-date { color:#1D4ED8; font-weight:700; }
+  .cell.done.today .cell-date { color:#FFFFFF; font-weight:700; }
+  .cell.future .cell-date { color:#AAAAAA; }
+
+  /* TOAST */
+  .toast { position:fixed; top:60px; left:50%; transform:translateX(-50%) translateY(-20px); background:var(--surface2); border:1px solid var(--green); color:var(--cream); border-radius:20px; padding:10px 20px; font-size:13px; font-weight:500; opacity:0; transition:all 0.3s; pointer-events:none; white-space:nowrap; z-index:100; max-width:90vw; text-align:center; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* STREAK OVERLAY */
+  .streak-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.92); display:flex; align-items:center; justify-content:center; z-index:1000; opacity:0; pointer-events:none; transition:opacity 0.4s; }
+  .streak-overlay.show { opacity:1; pointer-events:all; }
+  .streak-overlay-inner { text-align:center; transform:scale(0.7); transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .streak-overlay.show .streak-overlay-inner { transform:scale(1); }
+  .streak-overlay-emoji { font-size:72px; margin-bottom:8px; animation:bob 1s ease-in-out infinite alternate; }
+  @keyframes bob { from{transform:translateY(0)} to{transform:translateY(-12px)} }
+  .streak-overlay-number { font-family:'DM Serif Display',serif; font-size:110px; line-height:1; color:var(--gold); letter-spacing:-0.04em; }
+  .streak-overlay-label { font-family:'DM Mono',monospace; font-size:13px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-top:4px; margin-bottom:20px; }
+  .streak-overlay-msg { font-family:'DM Serif Display',serif; font-style:italic; font-size:22px; color:var(--cream); max-width:260px; margin:0 auto; line-height:1.4; }
+  .tap-hint { margin-top:28px; font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.15em; color:rgba(255,255,255,0.3); text-transform:uppercase; }
+
+  /* SETTINGS */
+  .settings-toggle { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:12px 0; border-top:1px solid var(--border); }
+  .settings-toggle-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted); }
+  .settings-chevron { color:var(--muted); font-size:12px; transition:transform 0.2s; }
+  .settings-chevron.open { transform:rotate(180deg); }
+  .settings-panel { display:none; flex-direction:column; gap:14px; padding:16px 0 8px; border-bottom:1px solid var(--border); margin-bottom:12px; }
+  .settings-panel.open { display:flex; }
+  .field-group { display:flex; flex-direction:column; gap:6px; }
+  .field-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); }
+  .field-input { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; color:var(--cream); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:300; width:100%; outline:none; transition:border-color 0.15s; }
+  .field-input:focus { border-color:var(--green); }
+  .field-input::placeholder { color:var(--muted); }
+  .save-btn { background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--cream); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; padding:11px; cursor:pointer; transition:all 0.15s; width:100%; }
+  .save-btn:active { opacity:0.7; }
+  .setup-note { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--gold); border-radius:4px; padding:14px 16px; margin-top:4px; }
+  .setup-note p { font-size:12px; line-height:1.65; color:var(--muted); }
+  .setup-note strong { color:var(--gold); font-weight:500; }
+  .setup-note a { color:var(--green); text-decoration:none; }
+  .emailjs-fields { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+  .reset-link { text-align:center; margin-top:16px; font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:2000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+  .modal-backdrop.show { opacity:1; pointer-events:all; }
+  .modal { background:#1C1A17; border:1px solid #2E2B27; border-radius:16px; padding:28px 24px; max-width:300px; width:90%; text-align:center; transform:scale(0.9); transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+  .modal-backdrop.show .modal { transform:scale(1); }
+  .modal-title { font-family:'DM Serif Display',serif; font-size:20px; color:var(--cream); margin-bottom:10px; }
+  .modal-msg { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:24px; }
+  .modal-btns { display:flex; gap:10px; }
+  .modal-btn { flex:1; padding:12px; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500; cursor:pointer; border:none; transition:opacity 0.15s; }
+  .modal-btn:active { opacity:0.7; }
+  .modal-btn.cancel { background:#2E2B27; color:var(--cream); }
+  .modal-btn.confirm { background:#DC2626; color:#fff; }
+</style>
+</head>
+<body>
+
+<canvas id="celebCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;"></canvas>
+
+<div class="streak-overlay" id="streakOverlay">
+  <div class="streak-overlay-inner">
+    <div class="streak-overlay-emoji" id="streakEmoji">🔥</div>
+    <div class="streak-overlay-number" id="streakOverlayNum">3</div>
+    <div class="streak-overlay-label">day streak!</div>
+    <div class="streak-overlay-msg" id="streakMsg">You're on fire!</div>
+    <div class="tap-hint">Tap to continue</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="app">
+
+  <div class="header">
+    <div class="header-eyebrow">Habit Tracker</div>
+    <div class="header-name" id="headerTitle"><em>Keep up the good work!</em></div>
+  </div>
+
+  <div class="streak-badge">
+    <div class="streak-number" id="streakNum">0</div>
+    <div class="streak-label">day streak</div>
+  </div>
+
+  <div class="month-nav">
+    <button class="nav-btn" id="prevBtn" onclick="changeMonth(-1)">&#8592;</button>
+    <div class="month-title" id="monthTitle">—</div>
+    <button class="nav-btn" id="nextBtn" onclick="changeMonth(1)">&#8594;</button>
+  </div>
+
+  <div class="day-labels">
+    <div class="day-label">M</div>
+    <div class="day-label">T</div>
+    <div class="day-label">W</div>
+    <div class="day-label">T</div>
+    <div class="day-label">F</div>
+    <div class="day-label">S</div>
+    <div class="day-label">S</div>
+  </div>
+
+  <div class="cal-grid" id="calGrid"></div>
+
+  <div class="settings-toggle" onclick="toggleSettings()">
+    <span class="settings-toggle-label">Settings & Accountability</span>
+    <span class="settings-chevron" id="chevron">▼</span>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="field-group">
+      <div class="field-label">Your Name</div>
+      <input class="field-input" id="userName" type="text" placeholder="e.g. Alex" maxlength="40">
+    </div>
+    <div class="field-group">
+      <div class="field-label">Your Habit</div>
+      <input class="field-input" id="habitName" type="text" placeholder="e.g. Daily Study, Exercise…" maxlength="60">
+    </div>
+    <div class="field-group">
+      <div class="field-label">Accountability Email</div>
+      <input class="field-input" id="recipientEmail" type="email" placeholder="family member's email">
+    </div>
+    <div class="setup-note">
+      <p><strong>📧 Email Setup (one-time, free)</strong><br>
+      Create a free account at <a href="https://www.emailjs.com" target="_blank">emailjs.com</a>, connect an email service, create a template using <code style="color:var(--gold)">{{from_name}}</code>, <code style="color:var(--gold)">{{habit}}</code>, <code style="color:var(--gold)">{{message}}</code>, then paste your keys below.</p>
+      <div class="emailjs-fields">
+        <input class="field-input" id="ejsPublicKey" type="text" placeholder="EmailJS Public Key" value="lIJYluA4APpDBx10F">
+        <input class="field-input" id="ejsServiceId" type="text" placeholder="EmailJS Service ID">
+        <input class="field-input" id="ejsTemplateId" type="text" placeholder="EmailJS Template ID">
+      </div>
+    </div>
+    <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+  <div class="reset-link" onclick="showResetModal()">Reset all data</div>
+
+</div>
+
+<div class="modal-backdrop" id="resetModal">
+  <div class="modal">
+    <div class="modal-title">Reset all data?</div>
+    <div class="modal-msg">All ticked days will be cleared. Your name, habit and email settings will be kept.</div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="hideResetModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="doReset()">Yes, reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── STORAGE ────────────────────────────────────────────────────────────────
+  const STORAGE_KEY = 'habit_tracker_v3';
+
+  function getState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    const now = new Date();
+    return {
+      startYear: now.getFullYear(),
+      startMonth: now.getMonth(), // 0-indexed
+      ticked: {},
+      userName: '',
+      habitName: '',
+      recipientEmail: '',
+      ejsPublicKey: 'lIJYluA4APpDBx10F',
+      ejsServiceId: '',
+      ejsTemplateId: ''
+    };
+  }
+
+  function saveState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+
+  // ── DATE HELPERS ──────────────────────────────────────────────────────────
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  function makeKey(year, month, day) {
+    return `${year}-${pad(month+1)}-${pad(day)}`;
+  }
+
+  function daysInMonth(year, month) {
+    return new Date(year, month+1, 0).getDate();
+  }
+
+  // Monday=0 offset for first day of month
+  function firstDayOffset(year, month) {
+    const day = new Date(year, month, 1).getDay(); // 0=Sun
+    return (day + 6) % 7; // Mon=0
+  }
+
+  // ── STREAK (counts all consecutive ticked days globally) ──────────────────
+  function getStreakCount(state) {
+    // Collect all ticked keys, sort descending, count consecutive
+    const keys = Object.keys(state.ticked).filter(k => state.ticked[k]).sort().reverse();
+    if (!keys.length) return 0;
+
+    // Find the highest ticked date
+    const top = keys[0];
+    let streak = 0;
+    let cursor = new Date(top + 'T00:00:00');
+
+    while (true) {
+      const k = `${cursor.getFullYear()}-${pad(cursor.getMonth()+1)}-${pad(cursor.getDate())}`;
+      if (state.ticked[k]) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  // ── VIEW STATE ─────────────────────────────────────────────────────────────
+  const now = new Date();
+  let viewYear = now.getFullYear();
+  let viewMonth = now.getMonth();
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const STREAK_MESSAGES = {
+    3:  { emoji: '🔥', msg: "Three days straight. The habit is forming!" },
+    7:  { emoji: '⚡', msg: "One full week! You're unstoppable." },
+    14: { emoji: '🌟', msg: "Two weeks solid. This is who you are now." },
+    21: { emoji: '🏆', msg: "21 days — the habit is locked in!" },
+    30: { emoji: '🎯', msg: "30 days! You're a machine." },
+    60: { emoji: '💎', msg: "60 days. This is a lifestyle now." },
+    90: { emoji: '🚀', msg: "90 days. Absolutely elite." },
+    180:{ emoji: '👑', msg: "Half a year. Legendary." },
+    365:{ emoji: '🌏', msg: "One full year. You did it!" }
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  function render() {
+    const state = getState();
+    const today = todayKey();
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    // Month title
+    document.getElementById('monthTitle').textContent = `${MONTH_NAMES[viewMonth]} ${viewYear}`;
+
+    // Nav button limits: startMonth to startMonth+11
+    const startY = state.startYear, startM = state.startMonth;
+    const minMonths = startY * 12 + startM;
+    const maxMonths = minMonths + 35;
+    const curMonths = viewYear * 12 + viewMonth;
+    document.getElementById('prevBtn').disabled = curMonths <= minMonths;
+    document.getElementById('nextBtn').disabled = curMonths >= maxMonths;
+
+    // Empty cells for offset
+    const offset = firstDayOffset(viewYear, viewMonth);
+    for (let i = 0; i < offset; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'cell empty';
+      grid.appendChild(empty);
+    }
+
+    // Day cells
+    const days = daysInMonth(viewYear, viewMonth);
+    for (let d = 1; d <= days; d++) {
+      const key = makeKey(viewYear, viewMonth, d);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      if (state.ticked[key]) cell.classList.add('done');
+      if (key === today) cell.classList.add('today');
+
+      const dateSpan = document.createElement('span');
+      dateSpan.className = 'cell-date';
+      dateSpan.textContent = d;
+      cell.appendChild(dateSpan);
+
+      cell.addEventListener('click', () => toggleDay(key));
+      grid.appendChild(cell);
+    }
+
+    // Streak
+    const streak = getStreakCount(state);
+    document.getElementById('streakNum').textContent = streak;
+
+    // Header title
+    const name = state.userName;
+    const habit = state.habitName;
+    const titleEl = document.getElementById('headerTitle');
+    if (name || habit) {
+      titleEl.innerHTML = `<em>${name ? name + ' · ' : ''}${habit || 'Habit Tracker'}</em>`;
+    }
+
+    // Settings fields
+    document.getElementById('userName').value = state.userName || '';
+    document.getElementById('habitName').value = state.habitName || '';
+    document.getElementById('recipientEmail').value = state.recipientEmail || '';
+    document.getElementById('ejsPublicKey').value = state.ejsPublicKey || 'lIJYluA4APpDBx10F';
+    document.getElementById('ejsServiceId').value = state.ejsServiceId || '';
+    document.getElementById('ejsTemplateId').value = state.ejsTemplateId || '';
+  }
+
+  function changeMonth(dir) {
+    viewMonth += dir;
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+    render();
+  }
+
+  // ── ACTIONS ────────────────────────────────────────────────────────────────
+  function toggleDay(key) {
+    const state = getState();
+    if (state.ticked[key]) {
+      delete state.ticked[key];
+      saveState(state);
+      render();
+    } else {
+      state.ticked[key] = true;
+      saveState(state);
+      if (key === todayKey()) sendEmail(state);
+      const streak = getStreakCount(state);
+      render();
+      if (STREAK_MESSAGES[streak]) {
+        setTimeout(() => checkStreakMilestone(streak), 400);
+      } else {
+        launchCelebration(false);
+      }
+    }
+  }
+
+  // ── EMAIL ──────────────────────────────────────────────────────────────────
+  function sendEmail(state) {
+    const { recipientEmail, userName, habitName, ejsPublicKey, ejsServiceId, ejsTemplateId } = state;
+    if (!recipientEmail || !ejsServiceId || !ejsTemplateId) {
+      showToast('✓ Ticked! (Add email settings to notify your accountability partner)');
+      return;
+    }
+    const name = userName || 'Someone';
+    const habit = habitName || 'their daily habit';
+    emailjs.init({ publicKey: ejsPublicKey || 'lIJYluA4APpDBx10F' });
+    emailjs.send(ejsServiceId, ejsTemplateId, {
+      to_email: recipientEmail,
+      from_name: name,
+      habit: habit,
+      message: `${name} has ticked off their daily habit to ${habit}. Have you done yours?`
+    }).then(() => showToast('✓ Ticked! Accountability email sent 🎉'))
+      .catch(() => showToast('✓ Ticked! (Email failed — check your EmailJS settings)'));
+  }
+
+  // ── SETTINGS ───────────────────────────────────────────────────────────────
+  function saveSettings() {
+    const state = getState();
+    state.userName = document.getElementById('userName').value.trim();
+    state.habitName = document.getElementById('habitName').value.trim();
+    state.recipientEmail = document.getElementById('recipientEmail').value.trim();
+    state.ejsPublicKey = document.getElementById('ejsPublicKey').value.trim() || 'lIJYluA4APpDBx10F';
+    state.ejsServiceId = document.getElementById('ejsServiceId').value.trim();
+    state.ejsTemplateId = document.getElementById('ejsTemplateId').value.trim();
+    saveState(state);
+    render();
+    showToast('Settings saved ✓');
+  }
+
+  function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    const chevron = document.getElementById('chevron');
+    panel.classList.toggle('open');
+    chevron.classList.toggle('open');
+  }
+
+  function showResetModal() {
+    document.getElementById('resetModal').classList.add('show');
+  }
+
+  function hideResetModal() {
+    document.getElementById('resetModal').classList.remove('show');
+  }
+
+  function doReset() {
+    hideResetModal();
+    const state = getState();
+    const n = new Date();
+    state.startYear = n.getFullYear();
+    state.startMonth = n.getMonth();
+    state.ticked = {};
+    saveState(state);
+    viewYear = n.getFullYear();
+    viewMonth = n.getMonth();
+    render();
+    showToast('Tracker reset — fresh start! 🌱');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  // ── CELEBRATIONS ───────────────────────────────────────────────────────────
+  const canvas = document.getElementById('celebCanvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let animFrame = null;
+
+  function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const COLORS = ['#4A8C5C','#C9973A','#F0EAE0','#7BC47F','#FFD166','#E8A87C','#A8D8A8'];
+
+  function spawnParticles(count, burst) {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.38;
+    for (let i = 0; i < count; i++) {
+      const angle = burst ? (Math.PI*2*i/count) + (Math.random()-0.5)*0.6 : Math.random()*Math.PI*2;
+      const speed = burst ? 6+Math.random()*14 : 3+Math.random()*10;
+      particles.push({
+        x: cx+(Math.random()-0.5)*40, y: cy+(Math.random()-0.5)*30,
+        vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed-(burst?2:0),
+        gravity: 0.25+Math.random()*0.3,
+        alpha: 1, decay: 0.008+Math.random()*0.008,
+        color: COLORS[Math.floor(Math.random()*COLORS.length)],
+        size: 4+Math.random()*(burst?10:6),
+        shape: Math.random()<0.5?'circle':'rect',
+        spin: (Math.random()-0.5)*0.3, rotation: Math.random()*Math.PI*2
+      });
+    }
+  }
+
+  function animateParticles() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles = particles.filter(p=>p.alpha>0.01);
+    for (const p of particles) {
+      p.x+=p.vx; p.y+=p.vy; p.vy+=p.gravity; p.vx*=0.98;
+      p.alpha-=p.decay; p.rotation+=p.spin;
+      ctx.save(); ctx.globalAlpha=Math.max(0,p.alpha); ctx.fillStyle=p.color;
+      ctx.translate(p.x,p.y); ctx.rotate(p.rotation);
+      if (p.shape==='circle') { ctx.beginPath(); ctx.arc(0,0,p.size/2,0,Math.PI*2); ctx.fill(); }
+      else { ctx.fillRect(-p.size/2,-p.size/4,p.size,p.size/2); }
+      ctx.restore();
+    }
+    if (particles.length>0) animFrame=requestAnimationFrame(animateParticles);
+    else { ctx.clearRect(0,0,canvas.width,canvas.height); animFrame=null; }
+  }
+
+  function launchCelebration(big) {
+    if (animFrame) cancelAnimationFrame(animFrame);
+    particles=[];
+    spawnParticles(big?120:60,true);
+    if (big) { setTimeout(()=>spawnParticles(80,true),300); setTimeout(()=>spawnParticles(60,false),700); }
+    else { setTimeout(()=>spawnParticles(30,false),250); }
+    animateParticles();
+  }
+
+  function checkStreakMilestone(streak) {
+    const milestone = STREAK_MESSAGES[streak];
+    if (!milestone) return;
+    const overlay = document.getElementById('streakOverlay');
+    document.getElementById('streakEmoji').textContent = milestone.emoji;
+    document.getElementById('streakOverlayNum').textContent = streak;
+    document.getElementById('streakMsg').textContent = milestone.msg;
+    overlay.classList.add('show');
+    overlay.style.pointerEvents='all';
+    launchCelebration(true);
+    const dismiss = () => {
+      overlay.classList.remove('show');
+      overlay.style.pointerEvents='none';
+      overlay.removeEventListener('click',dismiss);
+    };
+    overlay.addEventListener('click',dismiss);
+    setTimeout(dismiss,5000);
+  }
+
+  // ── INIT ───────────────────────────────────────────────────────────────────
+  render();
+</script>
+</body>
+</html>
